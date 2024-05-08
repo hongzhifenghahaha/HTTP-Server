@@ -1,0 +1,73 @@
+/**
+     * 处理来自客户端的请求
+     */
+    @Override
+    public void run() {
+        try {
+            // 初始化IO流
+            initStream();
+            // 打印连接信息
+            System.out.println("新的tcp连接，来自: " + socket.getInetAddress() + "：" + socket.getPort());
+
+            // 读取 request 报文
+            readRequest();
+
+            // 判断 header 是否为空
+            if (headerLine == null || headerLine.isEmpty()) {
+                response = "HTTP/1.1 400 Bad Request" + CRLF + CRLF;
+                sendResponse();
+            } else {
+                //判断第一行是不是GET和PUT之外的请求
+                String method = headerLine.get(0).split("\\s+")[0];
+                if (!"GET".equals(method) && !"PUT".equals(method)) {
+                    // 不是GET或PUT直接返回错误 400
+                    response = "HTTP/1.1 400 Bad Request" + CRLF + CRLF;
+                    sendResponse();
+                } else {
+                    String filename = null;
+                    for (String line : headerLine) {
+                        // 处理GET请求
+                        if (line.startsWith("GET")) {
+                            doGET(line);
+                        }
+                        // 处理PUT请求，获取文件名
+                        else if (line.startsWith("PUT")) {
+                            filename = doPUT(line);
+                        }
+                        // 处理PUT请求，获取内容的长度，
+                        else if (line.startsWith("Content-Length")) {
+                            if (null == filename) {
+                                break;
+                            }
+                            // 存储内容长度为 length 的文件
+                            int length = Integer.parseInt(line.split("\\s+")[1].trim());
+                            if (length > 0) {
+                                putFile(filename, length);
+                            }
+                        }
+                    }
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                // 关闭流
+                istream.close();
+                ostream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            if (null != socket) {
+                try {
+                    // 关闭socket
+                    System.out.println("port " + socket.getPort() + " : connection closed");
+                    socket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
